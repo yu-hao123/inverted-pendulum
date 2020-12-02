@@ -35,10 +35,38 @@ Q = diag([q1, q2, q3, q4]);
 
 [K,S,E] = dlqr(A,B,Q,R);
 
+Pf = S;
+Af = A - B*K;
+phi = B*(K*xbar + ubar);
+Gamma = [eye(4); -K];
+h = [zeros(4,1); K*xbar + ubar];
+
+% Control System Restrictions
+Sx = [1 0 0 0; -1 0 0 0; 0 0 1 0; 0 0 -1 0];
+%Sx = [1 0; -1 0; 0 1;0 -1];
+bx = [1; 0.1; pi/10; pi/10];
+Su = [1; -1];
+bu = [3; 3];
+
+Spsi = blkdiag(Sx, Su);
+bpsi = [bx; bu];
+
+max_iter = 100;
+tol = 0.01;
+[Sf, bf] = determine_oinf(Af,phi,Gamma,h,Spsi,bpsi,max_iter,tol);
+
+N = 18;
+un = optimization_u(A, B, Q, R, Pf, N, Sx, bx, ...
+    Su, bu, Sf, bf, x0, xbar, ubar);
+
 x{1} = x0;
-for k = 1:n_samples
-    u(k) = ubar - K * (x{k} - xbar);
-    x{k+1} = A * x{k} + B * u(k);
+for k = 1:N
+    u(k) = un(k);
+    x{k+1} = A*x{k} + B*u(k);
+end
+for k = N+1:N+80
+    u(k) = ubar - K*(x{k} - xbar);
+    x{k+1} = A*x{k} + B*u(k);
 end
 
 cellx = cell2mat(x);
@@ -70,5 +98,4 @@ ylim([-0.2, 0.1])
 xlabel('$k$', 'Interpreter','latex')
 set(gca,'TickLabelInterpreter','latex','FontSize',18);
 legend('$x_3(k)  \ [rad]$', '$x_4(k)  \ [rad/s]$', 'Interpreter','latex')
-
 
