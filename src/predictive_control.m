@@ -46,7 +46,7 @@ Sx = [1 0 0 0; -1 0 0 0; 0 0 1 0; 0 0 -1 0];
 %Sx = [1 0; -1 0; 0 1;0 -1];
 bx = [1; 0.1; pi/10; pi/10];
 Su = [1; -1];
-bu = [3; 3];
+bu = [1; 1];
 
 Spsi = blkdiag(Sx, Su);
 bpsi = [bx; bu];
@@ -55,47 +55,55 @@ max_iter = 100;
 tol = 0.01;
 [Sf, bf] = determine_oinf(Af,phi,Gamma,h,Spsi,bpsi,max_iter,tol);
 
-N = 18;
+N = 30;
 un = optimization_u(A, B, Q, R, Pf, N, Sx, bx, ...
     Su, bu, Sf, bf, x0, xbar, ubar);
 
+state_equation = @(t,x,u) ...
+    [x(2); m*g*x(3)/M + u/M; x(4); (M+m)*g*x(3)/(M*L) + u/(M*L)];
 x{1} = x0;
+trec = 0; xrec = x{1}';
 for k = 1:N
     u(k) = un(k);
-    x{k+1} = A*x{k} + B*u(k);
+    [tout,xout] = ode45(@(t,x)state_equation(t,x,u(k)),[(k-1)*Ts k*Ts],x{k});
+    trec = [trec;tout(2:end)];
+    xrec = [xrec;xout(2:end,:)];
+    x{k+1} = xrec(end,:)';
 end
-for k = N+1:N+80
+for k = N+1:N+70
     u(k) = ubar - K*(x{k} - xbar);
-    x{k+1} = A*x{k} + B*u(k);
+    [tout,xout] = ode45(@(t,x)state_equation(t,x,u(k)),[(k-1)*Ts k*Ts],x{k});
+    trec = [trec;tout(2:end)];
+    xrec = [xrec;xout(2:end,:)];
+    x{k+1} = xrec(end,:)';
 end
 
-cellx = cell2mat(x);
-
-stairs(u, 'k', 'LineWidth', 1);
-xlabel('$k$', 'Interpreter','latex')
+k = 0:n_samples;
+figure;
+stairs(k*Ts,[u u(end)], 'k', 'LineWidth', 1);
+xlabel('$t \ [s]$', 'Interpreter', 'latex');
+set(gca,'TickLabelInterpreter','latex','FontSize',18);
 legend('$u(k) \ [N]$', 'Interpreter', 'latex')
-set(gca,'TickLabelInterpreter','latex','FontSize',18);
-figure; grid on;
-yyaxis left
-plot(cellx(1, :),  'LineWidth', 1);
-ylim([-0.3, 1.5])
-xlim([0, n_samples]);
-yyaxis right
-plot(cellx(2, :),  'LineWidth', 1);
-ylim([-0.1, 0.5])
-xlabel('$k$', 'Interpreter','latex')
-legend('$x_1(k)  \ [m]$', '$x_2(k)  \ [m/s]$', 'Interpreter','latex')
-set(gca,'TickLabelInterpreter','latex','FontSize',18);
+ylim([-2, 2])
+yline(1, 'r--', 'LineWidth', 1, 'HandleVisibility', 'off');
+yline(-1, 'r--', 'LineWidth', 1, 'HandleVisibility', 'off');
 
-figure; grid on;
-yyaxis left
-plot(cellx(3, :),  'LineWidth', 1);
-ylim([-0.2, 0.1])
-xlim([0, n_samples]);
-yyaxis right
-plot(cellx(4, :),  'LineWidth', 1);
-ylim([-0.2, 0.1])
-xlabel('$k$', 'Interpreter','latex')
+figure, plot(trec,xrec(:,1), 'k', 'LineWidth', 1)
 set(gca,'TickLabelInterpreter','latex','FontSize',18);
-legend('$x_3(k)  \ [rad]$', '$x_4(k)  \ [rad/s]$', 'Interpreter','latex')
-
+legend('$x_1(k)  \ [m]$', 'Interpreter','latex')
+xlabel('$t \ [s]$', 'Interpreter', 'latex');
+figure, plot(trec,xrec(:,2),  'k', 'LineWidth', 1)
+set(gca,'TickLabelInterpreter','latex','FontSize',18);
+legend('$x_2(k)  \ [m/s]$', 'Interpreter','latex')
+xlabel('$t \ [s]$', 'Interpreter', 'latex');
+ylim([-0.1, 0.4])
+figure, plot(trec,xrec(:,3),  'k', 'LineWidth', 1)
+set(gca,'TickLabelInterpreter','latex','FontSize',18);
+legend('$x_3(k)  \ [rad]$', 'Interpreter','latex')
+xlabel('$t \ [s]$', 'Interpreter', 'latex');
+ylim([-0.1, 0.1])
+figure, plot(trec,xrec(:,4),  'k', 'LineWidth', 1)
+set(gca,'TickLabelInterpreter','latex','FontSize',18);
+legend('$x_4(k)  \ [rad/s]$', 'Interpreter','latex')
+xlabel('$t \ [s]$', 'Interpreter', 'latex');
+ylim([-0.1, 0.1])
